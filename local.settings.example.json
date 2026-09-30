@@ -1,0 +1,13 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "DIAN_ENDPOINT": "https://vpfe.dian.gov.co/WcfDianCustomerServices.svc",
+    "DIAN_REQUEST_TIMEOUT_SECONDS": "60",
+    "DIAN_TIMESTAMP_TTL_SECONDS": "60",
+    "DIAN_PFX_PATH": "CONFIGURE_ONLY_FOR_LOCAL_TESTS",
+    "DIAN_PFX_BASE64": "CONFIGURE_AS_PROTECTED_APP_SETTING_FOR_POC_ONLY",
+    "DIAN_PFX_PASSWORD": "CONFIGURE_AS_SECRET"
+  }
+}
