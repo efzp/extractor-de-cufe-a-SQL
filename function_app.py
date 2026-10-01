@@ -9,9 +9,112 @@ from dian.errors import (
     DianServiceError,
 )
 from dian.service import run_dian_get_xml
+from dian_ingestion.errors import (
+    IngestionConfigurationError,
+    IngestionPersistenceError,
+    SpreadsheetValidationError,
+)
+from dian_ingestion.service import accept_upload, process_queued_load
 
 
 app = func.FunctionApp()
+
+
+@app.function_name(name="RecibirCargaDian")
+@app.route(
+    route="dian/cargas/{cliente_id}",
+    methods=["POST"],
+    auth_level=func.AuthLevel.FUNCTION,
+)
+def receive_dian_load(req: func.HttpRequest) -> func.HttpResponse:
+    """Recibe un XLSX, lo almacena en Blob y agenda su procesamiento."""
+    try:
+        client_id = int(req.route_params.get("cliente_id", ""))
+    except (TypeError, ValueError):
+        return _json_response(
+            {
+                "status": "REJECTED",
+                "message": "El ClienteID de la ruta debe ser un entero positivo.",
+            },
+            status_code=400,
+        )
+
+    try:
+        queued_load = accept_upload(
+            client_id=client_id,
+            file_name=req.headers.get("x-file-name", ""),
+            content=req.get_body(),
+            sharepoint_item_id=req.headers.get("x-sharepoint-item-id"),
+            sharepoint_url=req.headers.get("x-sharepoint-url"),
+            etag=req.headers.get("x-sharepoint-etag"),
+            preferred_table_name=req.headers.get("x-table-name"),
+            uploaded_by=req.headers.get("x-uploaded-by"),
+        )
+        return _json_response(
+            {
+                "status": "ACCEPTED",
+                "correlationId": queued_load.correlation_id,
+                "clienteId": queued_load.client_id,
+                "fileName": queued_load.file_name,
+                "message": "El archivo fue almacenado y quedó pendiente de procesamiento.",
+            },
+            status_code=202,
+        )
+    except SpreadsheetValidationError as error:
+        return _json_response(
+            {"status": "REJECTED", "message": str(error)},
+            status_code=400,
+        )
+    except IngestionConfigurationError:
+        logging.exception("La ingestión DIAN no está configurada correctamente.")
+        return _json_response(
+            {
+                "status": "NOT_CONFIGURED",
+                "message": "Falta configurar almacenamiento o Azure SQL.",
+            },
+            status_code=503,
+        )
+    except Exception:
+        logging.exception("No fue posible recibir el listado DIAN.")
+        return _json_response(
+            {
+                "status": "ERROR",
+                "message": "No fue posible almacenar y agendar el archivo.",
+            },
+            status_code=500,
+        )
+
+
+@app.function_name(name="ProcesarCargaDian")
+@app.queue_trigger(
+    arg_name="message",
+    queue_name="%DIAN_LOAD_QUEUE_NAME%",
+    connection="DianStorage",
+)
+def process_dian_load(message: func.QueueMessage) -> None:
+    """Procesa un XLSX encolado y registra su trazabilidad en Azure SQL."""
+    try:
+        summary = process_queued_load(message.get_body().decode("utf-8"))
+        logging.info(
+            "Carga DIAN procesada. correlationId=%s cargaArchivoId=%s "
+            "estado=%s total=%s errores=%s encolados=%s",
+            summary.correlation_id,
+            summary.load_id,
+            summary.status,
+            summary.total_rows,
+            summary.error_rows,
+            summary.queued_documents,
+        )
+    except (
+        SpreadsheetValidationError,
+        IngestionConfigurationError,
+        IngestionPersistenceError,
+    ):
+        logging.exception("Falló el procesamiento controlado de una carga DIAN.")
+        raise
+    except Exception:
+        logging.exception("Falló inesperadamente el procesamiento de una carga DIAN.")
+        raise
 
 
 @app.function_name(name="DianGetXmlPoc")

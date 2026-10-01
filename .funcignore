@@ -1,1 +1,11 @@
-.venv
+.venv/
+.git/
+.github/
+__pycache__/
+*.py[cod]
+local.settings.json
+*.p12
+*.pfx
+tests/
+sql/
+docs/

@@ -1,0 +1,6 @@
+SET XACT_ABORT ON;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE [name] = N'dian')
+    EXEC(N'CREATE SCHEMA [dian] AUTHORIZATION [dbo];');
+GO

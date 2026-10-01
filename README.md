@@ -1,12 +1,17 @@
 # Automatización XML CUFE DIAN
 
-Prueba de concepto de Azure Functions para consultar en la DIAN el XML de un
-documento electrónico mediante su CUFE. La solicitud usa SOAP 1.2,
-WS-Addressing y WS-Security con un certificado digital PFX.
+Azure Functions para ingerir listados XLSX de la DIAN, registrar documentos y
+su trazabilidad en Azure SQL, y consultar XML mediante CUFE. La integración
+SOAP usa SOAP 1.2, WS-Addressing y WS-Security con certificado digital.
 
-Este proyecto no guarda archivos ni escribe registros en una base de datos.
-La persistencia, SharePoint/OneDrive y el procesamiento masivo se incorporarán
-después de validar la llamada autenticada.
+La ingestión masiva está implementada en dos etapas:
+
+- `RecibirCargaDian`: recibe el XLSX, lo guarda en Blob y agenda la carga.
+- `ProcesarCargaDian`: lee la tabla, normaliza sus filas, escribe mediante
+  procedimientos almacenados y encola documentos nuevos.
+
+`DianGetXmlPoc` continúa disponible como prueba de consulta individual sin
+persistencia.
 
 ## Preparación local
 
@@ -24,7 +29,9 @@ Copy-Item local.settings.example.json local.settings.json
 ```
 
 Configure en `local.settings.json` la ruta `DIAN_PFX_PATH` y
-`DIAN_PFX_PASSWORD`. No copie el certificado ni la contraseña al repositorio.
+`DIAN_PFX_PASSWORD`. Para probar la ingestión también debe configurar Azure
+Storage y Azure SQL usando las variables de `local.settings.example.json`. No
+copie el certificado ni la contraseña al repositorio.
 
 ## Ejecución
 
@@ -48,9 +55,12 @@ Invoke-RestMethod `
 Consulte [docs/DIAN_GET_XML_POC.md](docs/DIAN_GET_XML_POC.md) para ver el
 contrato completo y las consideraciones de seguridad.
 
+Consulte [docs/DIAN_XLSX_INGESTION.md](docs/DIAN_XLSX_INGESTION.md) para el
+contrato del endpoint de cargas, colas, variables y permisos.
+
 ## Pruebas
 
 ```powershell
-.\.venv\Scripts\python.exe -m compileall -q function_app.py dian tests
+.\.venv\Scripts\python.exe -m compileall -q function_app.py dian dian_ingestion tests
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```

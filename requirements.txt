@@ -1,4 +1,9 @@
 azure-functions
+azure-identity>=1.17,<2
+azure-storage-blob>=12.20,<13
+azure-storage-queue>=12.10,<13
 requests
 cryptography
 lxml
+openpyxl>=3.1,<4
+pyodbc>=5.1,<6
