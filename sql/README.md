@@ -24,11 +24,15 @@ Para una base de datos nueva, ejecutar en este orden:
    2. `procedures/sp_IniciarCargaArchivo.sql`.
    3. `procedures/sp_RegistrarDocumentoCarga.sql`.
    4. `procedures/sp_FinalizarCargaArchivo.sql`.
+   5. `procedures/sp_IniciarConsultaDocumento.sql`.
+   6. `procedures/sp_RegistrarXmlDocumento.sql`.
+   7. `procedures/sp_FinalizarConsultaDocumento.sql`.
 5. Las pruebas y confirmar el resultado `OK` en cada una:
    1. `tests/test_sp_RegistrarCliente.sql`.
    2. `tests/test_sp_IniciarCargaArchivo.sql`.
    3. `tests/test_sp_RegistrarDocumentoCarga.sql`.
    4. `tests/test_sp_FinalizarCargaArchivo.sql`.
+   5. `tests/test_ProcesamientoDocumentoDian.sql`.
 
 Las pruebas se revierten completamente y no conservan datos.
 
@@ -84,3 +88,34 @@ fila devuelve el registro existente sin duplicarlo.
 `CargaDocumento`. Si se informa `TotalFilasEsperadas`, también detecta filas
 que la Function no alcanzó a registrar. Devuelve `OK`, `PARCIAL`,
 `REQUIERE_REVISION` o `ERROR` y es idempotente ante llamadas repetidas.
+
+## Contrato de consulta y XML
+
+`sp_IniciarConsultaDocumento` valida que el cliente, CUFE/CUDE, carga y version
+del mensaje correspondan al documento en SQL. Devuelve una fila con
+`ConsultaDianID`, `NumeroIntento`, `EstadoProceso`, `Resultado` y
+`DebeConsultar`. `CONSULTA_INICIADA` autoriza la llamada SOAP. El consumidor
+debe volver a lanzar el mensaje a Azure Queue si recibe
+`CONSULTA_EN_PROGRESO`, para que un reclamo abandonado pueda recuperarse al
+vencer `TiempoReclamoSegundos`. `XML_YA_REGISTRADO`, `ESTADO_NO_ELEGIBLE` y
+`MAXIMO_INTENTOS` no deben consultar de nuevo a la DIAN.
+
+`sp_RegistrarXmlDocumento` se llama despues de guardar el XML en Blob. Exige
+una ruta deterministica bajo
+`xml-dian/clientes/{clienteId}/documentos/{documentoId}/{hashSha256}.xml`,
+registra el hash, URI, tamano y tipo XML, y
+devuelve `XML_REGISTRADO` o `XML_EXISTENTE`. Solo permite un XML vigente por
+documento y no sobrescribe un XML diferente.
+
+`sp_FinalizarConsultaDocumento` cierra el intento. `OK` requiere un XML
+vigente vinculado a la consulta y cambia el documento a `XML_DESCARGADO`;
+`NO_ENCONTRADO` es terminal; `REINTENTO` devuelve el documento a
+`PENDIENTE_DESCARGA`, salvo cuando se alcanzo `MaximoIntentos`, caso en el que
+queda en `ERROR`. Una finalizacion repetida devuelve `YA_FINALIZADA`. Los tres
+procedimientos registran las transiciones pertinentes en
+`DocumentoProcesoHistorial` y conceden solo `EXECUTE` a `dian_runtime`.
+
+Para el editor web de Azure SQL, ejecutar cada lote `CREATE OR ALTER` de forma
+separada y luego su `GRANT`. La prueba SQL requiere instalar antes los tres
+procedimientos en un entorno de validacion. Sus datos se crean dentro de una
+transaccion que siempre se revierte.
