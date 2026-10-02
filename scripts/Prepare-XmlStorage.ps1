@@ -98,7 +98,7 @@ if ($null -ne $publicAccess -and
 
 $assignments = @(Invoke-AzJson @(
     'role', 'assignment', 'list', '--scope', $containerScope,
-    '--all', '--include-inherited'
+    '--include-inherited'
 ))
 $roleSuffix = "/roleDefinitions/$blobContributorRoleId"
 $existingRole = $assignments | Where-Object {

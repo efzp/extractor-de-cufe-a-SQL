@@ -44,6 +44,11 @@ function global:az {
             return
         }
         '^role assignment list$' {
+            if ($CliArguments -contains '--all' -or
+                $CliArguments -notcontains '--scope' -or
+                $CliArguments -notcontains '--include-inherited') {
+                throw 'La consulta de roles debe usar --scope y --include-inherited, sin --all.'
+            }
             if ($global:Scenario -eq 'create') {
                 '[]'
             }
