@@ -4,7 +4,7 @@ from .security import load_pfx
 from .soap import build_get_xml_request
 
 
-def run_dian_get_xml(cufe: str, settings: DianSettings | None = None) -> dict:
+def fetch_dian_document(cufe: str, settings: DianSettings | None = None):
     settings = settings or DianSettings.from_environment()
     private_key, certificate = load_pfx(settings)
     request_xml = build_get_xml_request(
@@ -15,11 +15,15 @@ def run_dian_get_xml(cufe: str, settings: DianSettings | None = None) -> dict:
         private_key=private_key,
         certificate=certificate,
     )
-    result = DianSoapClient(
+    return DianSoapClient(
         endpoint=settings.endpoint,
         action=settings.action,
         timeout_seconds=settings.request_timeout_seconds,
     ).get_xml(request_xml)
+
+
+def run_dian_get_xml(cufe: str, settings: DianSettings | None = None) -> dict:
+    result = fetch_dian_document(cufe, settings)
 
     return {
         "status": "OK",

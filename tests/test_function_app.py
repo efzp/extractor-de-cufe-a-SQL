@@ -145,5 +145,30 @@ class DianLoadFunctionTests(unittest.TestCase):
         service.assert_called_once_with('{"schemaVersion":1}')
 
 
+class DianDocumentFunctionTests(unittest.TestCase):
+    def test_document_queue_trigger_processes_message(self):
+        message = SimpleNamespace(get_body=lambda: b'{"schemaVersion":1}')
+        summary = SimpleNamespace(
+            document_id=20, consultation_id=40, result="OK", retry_queued=False
+        )
+        with patch.object(
+            function_app, "process_queued_document", return_value=summary
+        ) as service:
+            function_app.process_dian_document(message)
+        service.assert_called_once_with('{"schemaVersion":1}')
+
+    def test_document_queue_trigger_propagates_failure(self):
+        message = SimpleNamespace(get_body=lambda: b'invalid')
+        with (
+            patch.object(
+                function_app, "process_queued_document",
+                side_effect=ValueError("invalid message"),
+            ),
+            patch.object(function_app.logging, "exception"),
+        ):
+            with self.assertRaises(ValueError):
+                function_app.process_dian_document(message)
+
+
 if __name__ == "__main__":
     unittest.main()

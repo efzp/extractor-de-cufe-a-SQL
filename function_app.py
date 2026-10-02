@@ -15,6 +15,7 @@ from dian_ingestion.errors import (
     SpreadsheetValidationError,
 )
 from dian_ingestion.service import accept_upload, process_queued_load
+from dian_ingestion.document_service import process_queued_document
 
 
 app = func.FunctionApp()
@@ -114,6 +115,29 @@ def process_dian_load(message: func.QueueMessage) -> None:
         raise
     except Exception:
         logging.exception("Falló inesperadamente el procesamiento de una carga DIAN.")
+        raise
+
+
+@app.function_name(name="ProcesarDocumentoDian")
+@app.queue_trigger(
+    arg_name="message",
+    queue_name="%DIAN_QUEUE_NAME%",
+    connection="DianStorage",
+)
+def process_dian_document(message: func.QueueMessage) -> None:
+    """Consulta el XML de un documento encolado y registra su resultado."""
+    try:
+        summary = process_queued_document(message.get_body().decode("utf-8"))
+        logging.info(
+            "Documento DIAN procesado. documentoId=%s consultaDianId=%s "
+            "resultado=%s reintentoEncolado=%s",
+            summary.document_id,
+            summary.consultation_id,
+            summary.result,
+            summary.retry_queued,
+        )
+    except Exception:
+        logging.exception("Fallo el procesamiento de un documento DIAN encolado.")
         raise
 
 

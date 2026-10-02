@@ -41,10 +41,17 @@ jobs:
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
 
+      - name: Test XML storage preparation without Azure
+        shell: pwsh
+        run: ./tests/Test-PrepareXmlStorage.ps1
+
   deploy:
     name: Deploy to Azure
     needs: validate
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    concurrency:
+      group: dian-function-dev-deploy
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -62,6 +69,19 @@ jobs:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Prepare private XML container and Function identity access
+        shell: pwsh
+        env:
+          DIAN_STORAGE_ACCOUNT: ${{ vars.DIAN_STORAGE_ACCOUNT }}
+          DIAN_STORAGE_RESOURCE_GROUP: ${{ vars.DIAN_STORAGE_RESOURCE_GROUP }}
+          AZURE_FUNCTIONAPP_RESOURCE_GROUP: ${{ vars.AZURE_FUNCTIONAPP_RESOURCE_GROUP }}
+        run: |
+          ./scripts/Prepare-XmlStorage.ps1 `
+            -StorageAccount $env:DIAN_STORAGE_ACCOUNT `
+            -StorageResourceGroup $env:DIAN_STORAGE_RESOURCE_GROUP `
+            -FunctionName $env:AZURE_FUNCTIONAPP_NAME `
+            -FunctionResourceGroup $env:AZURE_FUNCTIONAPP_RESOURCE_GROUP
 
       - name: Deploy Azure Function
         uses: Azure/functions-action@v1

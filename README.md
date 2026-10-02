@@ -4,11 +4,13 @@ Azure Functions para ingerir listados XLSX de la DIAN, registrar documentos y
 su trazabilidad en Azure SQL, y consultar XML mediante CUFE. La integración
 SOAP usa SOAP 1.2, WS-Addressing y WS-Security con certificado digital.
 
-La ingestión masiva está implementada en dos etapas:
+La ingestión masiva está implementada en tres etapas:
 
 - `RecibirCargaDian`: recibe el XLSX, lo guarda en Blob y agenda la carga.
 - `ProcesarCargaDian`: lee la tabla, normaliza sus filas, escribe mediante
   procedimientos almacenados y encola documentos nuevos.
+- `ProcesarDocumentoDian`: consume cada documento, consulta la DIAN, guarda
+  el XML en Blob y registra el resultado mediante procedimientos SQL.
 
 `DianGetXmlPoc` continúa disponible como prueba de consulta individual sin
 persistencia.
@@ -57,6 +59,10 @@ contrato completo y las consideraciones de seguridad.
 
 Consulte [docs/DIAN_XLSX_INGESTION.md](docs/DIAN_XLSX_INGESTION.md) para el
 contrato del endpoint de cargas, colas, variables y permisos.
+
+Consulte [docs/DEPLOY.md](docs/DEPLOY.md) antes de desplegar: GitHub Actions
+prepara el contenedor privado `xml-dian` y su permiso de identidad administrada
+antes de publicar la Function.
 
 ## Pruebas
 

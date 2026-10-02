@@ -6,6 +6,7 @@ from typing import Any
 from .config import IngestionSettings
 from .errors import IngestionPersistenceError
 from .models import NormalizedDocumentRow, QueuedLoad
+from .document_message import QueuedDocument
 
 
 SQL_COPT_SS_ACCESS_TOKEN = 1256
@@ -181,6 +182,53 @@ EXEC [dian].[sp_FinalizarCargaArchivo]
             (load_id, total_rows, message),
         )
 
+    def start_document(
+        self, message: QueuedDocument, max_attempts: int, claim_timeout_seconds: int
+    ) -> dict[str, Any]:
+        return self._execute_one(
+            """
+EXEC [dian].[sp_IniciarConsultaDocumento]
+    @DocumentoID = ?, @ClienteID = ?, @CargaArchivoID = ?,
+    @DocumentoVersionID = ?, @ClaveDocumento = ?,
+    @MaximoIntentos = ?, @TiempoReclamoSegundos = ?;
+""",
+            (
+                message.document_id, message.client_id, message.load_id,
+                message.version_id, message.document_key,
+                max_attempts, claim_timeout_seconds,
+            ),
+        )
+
+    def register_xml(
+        self, document_id: int, consultation_id: int, uri: str,
+        digest: str, size: int, xml_type: str | None,
+    ) -> dict[str, Any]:
+        return self._execute_one(
+            """
+EXEC [dian].[sp_RegistrarXmlDocumento]
+    @DocumentoID = ?, @ConsultaDianID = ?, @BlobUri = ?,
+    @HashXmlSha256 = ?, @TamanoBytes = ?, @TipoXmlDetectado = ?;
+""",
+            (document_id, consultation_id, uri, digest, size, xml_type),
+        )
+
+    def finish_document(
+        self, consultation_id: int, result: str, max_attempts: int,
+        *, dian_code: str | None = None, error_type: str | None = None,
+        duration_ms: int | None = None,
+    ) -> dict[str, Any]:
+        return self._execute_one(
+            """
+EXEC [dian].[sp_FinalizarConsultaDocumento]
+    @ConsultaDianID = ?, @Resultado = ?, @CodigoDian = ?,
+    @DuracionMs = ?, @ErrorTipo = ?, @MaximoIntentos = ?;
+""",
+            (
+                consultation_id, result, dian_code, duration_ms,
+                error_type, max_attempts,
+            ),
+        )
+
     def _execute_one(self, sql: str, parameters: tuple[Any, ...]) -> dict[str, Any]:
         if self._connection is None:
             raise IngestionPersistenceError("La conexión SQL no está abierta.")
@@ -203,4 +251,3 @@ EXEC [dian].[sp_FinalizarCargaArchivo]
             ) from error
         finally:
             cursor.close()
-

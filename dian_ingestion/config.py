@@ -16,6 +16,11 @@ class IngestionSettings:
     sql_database: str
     sql_driver: str
     max_upload_bytes: int
+    xml_container: str = "xml-dian"
+    max_document_attempts: int = 5
+    claim_timeout_seconds: int = 540
+    document_retry_delay_seconds: int = 60
+    max_xml_bytes: int = 20 * 1024 * 1024
 
     @property
     def storage_account_url(self) -> str:
@@ -44,15 +49,39 @@ class IngestionSettings:
                 "DIAN_SQL_DRIVER", "ODBC Driver 18 for SQL Server"
             ).strip(),
             max_upload_bytes=_positive_int("DIAN_MAX_UPLOAD_BYTES", "20971520"),
+            xml_container=os.environ.get("DIAN_XML_CONTAINER", "xml-dian").strip(),
+            max_document_attempts=_positive_int("DIAN_MAX_DOCUMENT_ATTEMPTS", "5"),
+            claim_timeout_seconds=_positive_int("DIAN_CLAIM_TIMEOUT_SECONDS", "540"),
+            document_retry_delay_seconds=_positive_int(
+                "DIAN_DOCUMENT_RETRY_DELAY_SECONDS", "60"
+            ),
+            max_xml_bytes=_positive_int("DIAN_MAX_XML_BYTES", "20971520"),
         )
         for name, value in (
             ("DIAN_LOAD_CONTAINER", settings.load_container),
             ("DIAN_LOAD_QUEUE_NAME", settings.load_queue),
             ("DIAN_QUEUE_NAME", settings.document_queue),
             ("DIAN_SQL_DRIVER", settings.sql_driver),
+            ("DIAN_XML_CONTAINER", settings.xml_container),
         ):
             if not value:
                 raise IngestionConfigurationError(f"{name} no puede estar vacío.")
+        if settings.max_document_attempts > 32767:
+            raise IngestionConfigurationError(
+                "DIAN_MAX_DOCUMENT_ATTEMPTS supera smallint."
+            )
+        if settings.claim_timeout_seconds > 86400:
+            raise IngestionConfigurationError(
+                "DIAN_CLAIM_TIMEOUT_SECONDS supera 86400."
+            )
+        if settings.document_retry_delay_seconds > 604800:
+            raise IngestionConfigurationError(
+                "DIAN_DOCUMENT_RETRY_DELAY_SECONDS supera 7 dias."
+            )
+        if settings.xml_container != "xml-dian":
+            raise IngestionConfigurationError(
+                "DIAN_XML_CONTAINER debe ser xml-dian por contrato SQL."
+            )
         return settings
 
 
@@ -71,4 +100,3 @@ def _positive_int(name: str, default: str) -> int:
     if value <= 0:
         raise IngestionConfigurationError(f"{name} debe ser positivo.")
     return value
-

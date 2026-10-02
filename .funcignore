@@ -9,3 +9,5 @@ local.settings.json
 tests/
 sql/
 docs/
+scripts/
+.codex_*.py
