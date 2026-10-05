@@ -88,6 +88,7 @@ class FakeRepository:
     def __init__(self):
         self.registered = []
         self.finished = []
+        self.finish_messages = []
 
     def __enter__(self):
         return self
@@ -121,11 +122,12 @@ class FakeRepository:
 
     def finish_load(self, load_id, total_rows, message=None):
         self.finished.append((load_id, total_rows))
+        self.finish_messages.append(message)
         return {
-            "Estado": "OK",
-            "TotalFilas": 2,
-            "FilasValidas": 2,
-            "FilasDuplicadas": 1,
+            "Estado": "OK" if total_rows else "ERROR",
+            "TotalFilas": total_rows,
+            "FilasValidas": total_rows,
+            "FilasDuplicadas": max(0, total_rows - 1),
             "FilasRevision": 0,
             "FilasError": 0,
         }
@@ -193,7 +195,67 @@ class IngestionServiceTests(unittest.TestCase):
         self.assertEqual(1, len(storage.document_messages))
         self.assertEqual(20, storage.document_messages[0]["documentoId"])
 
+    def test_application_response_is_not_registered_or_queued(self):
+        storage = FakeStorage()
+        repository = FakeRepository()
+        message = QueuedLoad(
+            schema_version=1,
+            correlation_id="correlation-2",
+            client_id=7,
+            file_name="listado.xlsx",
+            blob_name="cargas/listado.xlsx",
+        )
+        response_row = make_row(3, "b" * 96)
+        response_row.values["tipo_documento"] = "Application response"
+        workbook = WorkbookData(
+            sheet_name="Hoja1",
+            table_name="Tabla1",
+            rows=(make_row(2, "a" * 96), response_row),
+        )
+
+        result = process_queued_load(
+            message.to_json(),
+            settings=SETTINGS,
+            storage=storage,
+            repository_factory=lambda: repository,
+            workbook_reader=lambda content, table: workbook,
+        )
+
+        self.assertEqual([2], [row.row_number for _, row in repository.registered])
+        self.assertEqual([(10, 1)], repository.finished)
+        self.assertIn("ApplicationResponse omitidas: 1", repository.finish_messages[0])
+        self.assertEqual(1, result.ignored_rows)
+        self.assertEqual(1, result.total_rows)
+        self.assertEqual(1, len(storage.document_messages))
+
+    def test_only_application_responses_have_no_processable_documents(self):
+        storage = FakeStorage()
+        repository = FakeRepository()
+        message = QueuedLoad(
+            schema_version=1,
+            correlation_id="correlation-3",
+            client_id=7,
+            file_name="listado.xlsx",
+            blob_name="cargas/listado.xlsx",
+        )
+        response_row = make_row(2, "a" * 96)
+        response_row.values["tipo_documento"] = "ApplicationResponse"
+        workbook = WorkbookData("Hoja1", "Tabla1", (response_row,))
+
+        result = process_queued_load(
+            message.to_json(),
+            settings=SETTINGS,
+            storage=storage,
+            repository_factory=lambda: repository,
+            workbook_reader=lambda content, table: workbook,
+        )
+
+        self.assertEqual("ERROR", result.status)
+        self.assertEqual(1, result.ignored_rows)
+        self.assertEqual([(10, 0)], repository.finished)
+        self.assertEqual([], repository.registered)
+        self.assertEqual([], storage.document_messages)
+
 
 if __name__ == "__main__":
     unittest.main()
-

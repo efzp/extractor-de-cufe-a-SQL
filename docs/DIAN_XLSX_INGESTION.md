@@ -34,9 +34,17 @@ terminación de la carga.
 3. Normalización de las 32 columnas del reporte DIAN.
 4. Cálculo SHA-256 del archivo, de cada fila y del contenido contable.
 5. Ejecución de `dian.sp_IniciarCargaArchivo`.
-6. Ejecución de `dian.sp_RegistrarDocumentoCarga` por cada fila.
-7. Encolamiento de documentos nuevos en `documentos-pendientes`.
-8. Ejecución de `dian.sp_FinalizarCargaArchivo`.
+6. Omisión de filas cuyo `Tipo de documento` sea `Application response`.
+7. Ejecución de `dian.sp_RegistrarDocumentoCarga` por cada fila restante.
+8. Encolamiento de documentos nuevos en `documentos-pendientes`.
+9. Ejecución de `dian.sp_FinalizarCargaArchivo`.
+
+Las filas `Application response` no se registran como documentos ni se
+consultan a la DIAN. `TotalFilas` en SQL cuenta las filas procesables, no
+estas filas omitidas; la cantidad omitida queda en `CargaArchivo.Mensaje` y
+en el registro de la Function. El XLSX original permanece en `cargas-dian`.
+Si el archivo contiene solo respuestas de aplicación, la carga queda en
+`ERROR` porque no contiene documentos procesables.
 
 Las filas técnicas de Azure Queue se procesan de una en una. Si una ejecución
 se repite, SQL reconoce las filas ya registradas. Los mensajes de descarga son
@@ -52,6 +60,9 @@ intento como `REINTENTO` y vuelve a encolar el mensaje. `NO_ENCONTRADO` y los
 errores terminales no se reintentan. SQL limita los intentos por documento.
 Un mensaje mal formado se entrega al mecanismo de reintentos/poison de Azure
 Queue; no se consulta la DIAN para corregirlo.
+Como defensa adicional, si una consulta devuelve un XML de tipo
+`ApplicationResponse` pese a que el listado tenía otro tipo, ese XML no se
+almacena ni se registra y el intento termina en `ERROR`.
 
 ## Configuración
 

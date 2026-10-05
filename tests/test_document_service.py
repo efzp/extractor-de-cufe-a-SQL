@@ -178,6 +178,24 @@ class DocumentServiceTests(unittest.TestCase):
         self.assertEqual("90", repository.finished[0][3]["dian_code"])
         self.assertEqual([], storage.requeued)
 
+    def test_application_response_xml_is_not_stored_even_if_source_was_mislabeled(self):
+        repository = FakeRepository()
+        storage = FakeStorage()
+
+        summary = run(
+            repository,
+            storage,
+            lambda _: SimpleNamespace(
+                xml_bytes=b"<ApplicationResponse/>", code="Ok"
+            ),
+        )
+
+        self.assertEqual("ERROR", summary.result)
+        self.assertEqual([], storage.uploads)
+        self.assertEqual([], repository.registered)
+        self.assertEqual("UnsupportedXmlTypeError", repository.finished[0][3]["error_type"])
+        self.assertEqual([], storage.requeued)
+
     def test_transport_error_requeues_after_finalization(self):
         repository = FakeRepository()
         storage = FakeStorage()

@@ -98,11 +98,12 @@ def process_dian_load(message: func.QueueMessage) -> None:
         summary = process_queued_load(message.get_body().decode("utf-8"))
         logging.info(
             "Carga DIAN procesada. correlationId=%s cargaArchivoId=%s "
-            "estado=%s total=%s errores=%s encolados=%s",
+            "estado=%s totalProcesable=%s omitidos=%s errores=%s encolados=%s",
             summary.correlation_id,
             summary.load_id,
             summary.status,
             summary.total_rows,
+            summary.ignored_rows,
             summary.error_rows,
             summary.queued_documents,
         )

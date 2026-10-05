@@ -7,7 +7,7 @@ from typing import Callable
 
 from .config import IngestionSettings
 from .errors import SpreadsheetValidationError
-from .excel_reader import read_dian_workbook
+from .excel_reader import normalize_header, read_dian_workbook
 from .hashing import sha256_hex
 from .models import IngestionSummary, QueuedLoad, WorkbookData
 from .sql_repository import SqlRepository
@@ -87,6 +87,10 @@ def process_queued_load(
     workbook = workbook_reader(content, message.preferred_table_name)
     file_hash = sha256_hex(content)
     queued_documents = 0
+    eligible_rows = tuple(
+        row for row in workbook.rows if not _is_application_response(row)
+    )
+    ignored_rows = len(workbook.rows) - len(eligible_rows)
 
     with repository_factory() as repository:
         start = repository.start_load(message, file_hash, workbook.table_name)
@@ -106,7 +110,7 @@ def process_queued_load(
                 queued_documents=0,
             )
 
-        for row in workbook.rows:
+        for row in eligible_rows:
             result = repository.register_document(load_id, row)
             if _must_enqueue_document(result):
                 storage.enqueue_document(
@@ -123,7 +127,11 @@ def process_queued_load(
                 )
                 queued_documents += 1
 
-        final = repository.finish_load(load_id, len(workbook.rows))
+        note = (
+            f"Filas ApplicationResponse omitidas: {ignored_rows}."
+            if ignored_rows else None
+        )
+        final = repository.finish_load(load_id, len(eligible_rows), note)
 
     return IngestionSummary(
         correlation_id=message.correlation_id,
@@ -135,7 +143,13 @@ def process_queued_load(
         revision_rows=int(final["FilasRevision"] or 0),
         error_rows=int(final["FilasError"] or 0),
         queued_documents=queued_documents,
+        ignored_rows=ignored_rows,
     )
+
+
+def _is_application_response(row) -> bool:
+    document_type = normalize_header(row.values.get("tipo_documento"))
+    return document_type in ("application response", "applicationresponse")
 
 
 def _must_enqueue_document(result: dict) -> bool:
@@ -162,4 +176,3 @@ def _optional(value: str | None) -> str | None:
         return None
     normalized = str(value).strip()
     return normalized or None
-

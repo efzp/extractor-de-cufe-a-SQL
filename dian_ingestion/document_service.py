@@ -27,6 +27,10 @@ class DocumentProcessingSummary:
     retry_queued: bool = False
 
 
+class UnsupportedXmlTypeError(ValueError):
+    """El XML obtenido no corresponde a un documento útil para el proceso."""
+
+
 def process_queued_document(
     message_text: str,
     *,
@@ -73,6 +77,10 @@ def process_queued_document(
                 content, parser=etree.XMLParser(resolve_entities=False, no_network=True)
             )
             xml_type = etree.QName(root).localname[:80]
+            if xml_type.casefold() == "applicationresponse":
+                raise UnsupportedXmlTypeError(
+                    "ApplicationResponse no se almacena ni registra como XML útil."
+                )
             uri, digest = storage.upload_document(
                 message.client_id, message.document_id, content
             )

@@ -98,6 +98,7 @@ class IngestionSummary:
     revision_rows: int
     error_rows: int
     queued_documents: int
+    ignored_rows: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -108,4 +109,3 @@ def _optional_string(value: Any) -> str | None:
         return None
     normalized = str(value).strip()
     return normalized or None
-
