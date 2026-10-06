@@ -101,3 +101,20 @@ class StorageGateway:
             if blob.download_blob().readall() != content:
                 raise RuntimeError("El Blob XML existente tiene contenido diferente.")
         return blob.url, digest
+
+    def download_document(self, blob_name: str, max_bytes: int) -> bytes:
+        blob = self._blob_service.get_blob_client(
+            container=self._settings.xml_container, blob=blob_name
+        )
+        properties = blob.get_blob_properties()
+        if properties.size <= 0 or properties.size > max_bytes:
+            raise ValueError("El Blob XML excede el límite permitido.")
+        content = blob.download_blob(max_concurrency=1).readall()
+        if len(content) > max_bytes:
+            raise ValueError("El Blob XML excede el límite permitido.")
+        return content
+
+    def enqueue_xml_extraction(self, xml_id: int) -> None:
+        self._queue_service.get_queue_client(
+            self._settings.extraction_queue
+        ).send_message(json.dumps({"schemaVersion": 1, "documentoXmlId": xml_id}))

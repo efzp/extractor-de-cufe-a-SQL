@@ -16,6 +16,10 @@ from dian_ingestion.errors import (
 )
 from dian_ingestion.service import accept_upload, process_queued_load
 from dian_ingestion.document_service import process_queued_document
+from dian_ingestion.xml_extraction_service import (
+    enqueue_pending_extractions,
+    process_xml_extraction,
+)
 
 
 app = func.FunctionApp()
@@ -140,6 +144,26 @@ def process_dian_document(message: func.QueueMessage) -> None:
     except Exception:
         logging.exception("Fallo el procesamiento de un documento DIAN encolado.")
         raise
+
+
+@app.function_name(name="ProgramarExtraccionXmlDian")
+@app.timer_trigger(schedule="0 */5 * * * *", arg_name="timer", run_on_startup=False)
+def schedule_xml_extraction(timer: func.TimerRequest) -> None:
+    """Recupera XML históricos y nuevos que aún no tienen extracción v1."""
+    count = enqueue_pending_extractions()
+    logging.info("XML DIAN pendientes encolados: %s", count)
+
+
+@app.function_name(name="ExtraerXmlDian")
+@app.queue_trigger(
+    arg_name="message",
+    queue_name="%DIAN_XML_EXTRACTION_QUEUE_NAME%",
+    connection="DianStorage",
+)
+def extract_dian_xml(message: func.QueueMessage) -> None:
+    summary = process_xml_extraction(message.get_body().decode("utf-8"))
+    logging.info("Extracción XML DIAN. documentoXmlId=%s resultado=%s",
+                 summary["DocumentoXmlID"], summary["Resultado"])
 
 
 @app.function_name(name="DianGetXmlPoc")

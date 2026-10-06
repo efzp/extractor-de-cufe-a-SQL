@@ -21,6 +21,7 @@ class IngestionSettings:
     claim_timeout_seconds: int = 540
     document_retry_delay_seconds: int = 60
     max_xml_bytes: int = 20 * 1024 * 1024
+    extraction_queue: str = "xml-extraccion-pendiente"
 
     @property
     def storage_account_url(self) -> str:
@@ -56,6 +57,9 @@ class IngestionSettings:
                 "DIAN_DOCUMENT_RETRY_DELAY_SECONDS", "60"
             ),
             max_xml_bytes=_positive_int("DIAN_MAX_XML_BYTES", "20971520"),
+            extraction_queue=os.environ.get(
+                "DIAN_XML_EXTRACTION_QUEUE_NAME", "xml-extraccion-pendiente"
+            ).strip(),
         )
         for name, value in (
             ("DIAN_LOAD_CONTAINER", settings.load_container),
@@ -63,6 +67,7 @@ class IngestionSettings:
             ("DIAN_QUEUE_NAME", settings.document_queue),
             ("DIAN_SQL_DRIVER", settings.sql_driver),
             ("DIAN_XML_CONTAINER", settings.xml_container),
+            ("DIAN_XML_EXTRACTION_QUEUE_NAME", settings.extraction_queue),
         ):
             if not value:
                 raise IngestionConfigurationError(f"{name} no puede estar vacío.")

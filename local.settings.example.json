@@ -8,6 +8,7 @@
     "DIAN_LOAD_CONTAINER": "cargas-dian",
     "DIAN_LOAD_QUEUE_NAME": "cargas-pendientes",
     "DIAN_QUEUE_NAME": "documentos-pendientes",
+    "DIAN_XML_EXTRACTION_QUEUE_NAME": "xml-extraccion-pendiente",
     "DIAN_XML_CONTAINER": "xml-dian",
     "DIAN_MAX_DOCUMENT_ATTEMPTS": "5",
     "DIAN_CLAIM_TIMEOUT_SECONDS": "540",

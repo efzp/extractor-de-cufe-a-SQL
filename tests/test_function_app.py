@@ -170,5 +170,20 @@ class DianDocumentFunctionTests(unittest.TestCase):
                 function_app.process_dian_document(message)
 
 
+class XmlExtractionFunctionTests(unittest.TestCase):
+    def test_extraction_queue_trigger(self):
+        message = SimpleNamespace(get_body=lambda: b'{"schemaVersion":1,"documentoXmlId":12}')
+        with patch.object(function_app, "process_xml_extraction", return_value={
+            "DocumentoXmlID": 12, "Resultado": "REGISTRADA"
+        }) as service:
+            function_app.extract_dian_xml(message)
+        service.assert_called_once_with('{"schemaVersion":1,"documentoXmlId":12}')
+
+    def test_schedule_enqueues_pending(self):
+        with patch.object(function_app, "enqueue_pending_extractions", return_value=2) as service:
+            function_app.schedule_xml_extraction(SimpleNamespace())
+        service.assert_called_once_with()
+
+
 if __name__ == "__main__":
     unittest.main()

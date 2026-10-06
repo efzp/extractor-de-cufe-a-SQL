@@ -36,6 +36,60 @@ Para una base de datos nueva, ejecutar en este orden:
 
 Las pruebas se revierten completamente y no conservan datos.
 
+## Extracción tabular de XML (ampliación 003)
+
+Para el editor web de Azure SQL, se puede pegar y ejecutar **una sola vez** el
+contenido completo de `scripts/Instalar-ExtraccionXmlDian.sql`. No contiene
+`GO`: instala las tres tablas, cuatro procedimientos, permisos y vista en una
+transacción y devuelve `TablasExtraccion=3`, `ProcedimientosExtraccion=4`,
+`VistasExtraccion=1`. No combinarlo con los pasos individuales de abajo.
+El script se genera desde los archivos fuente mediante
+`scripts/Generar-InstalacionExtraccionXmlDian.py`; `--check` detecta si quedó
+desactualizado tras editar una fuente.
+
+En la base actual, ejecutar `migrations/003_xml_extraction.sql` antes de
+desplegar el código nuevo. Luego ejecutar **cada** archivo siguiente por
+separado si no se usa el script integrado (un `CREATE OR ALTER PROCEDURE` debe
+iniciar su lote):
+
+1. `procedures/sp_ObtenerXmlParaExtraccion.sql`
+2. `procedures/sp_ListarXmlPendientesExtraccion.sql`
+3. `procedures/sp_RegistrarExtraccionXml.sql`
+4. `procedures/sp_RegistrarErrorExtraccionXml.sql`
+5. `security/dian_xml_extraction_grants.sql`
+6. `views/vw_FacturaXmlMlV1.sql` (también en lote separado)
+
+No ejecutar de nuevo `scripts/Recrear-EsquemaDian.sql`: solo recrea la línea
+base vacía y no es una migración para la base con datos. La ampliación conserva
+`DocumentoXml`, `Documento` y sus datos existentes. `dian_runtime` no recibe
+acceso directo a tablas ni a la vista ML.
+
+Configurar `DIAN_XML_EXTRACTION_QUEUE_NAME=xml-extraccion-pendiente` y crear
+esa cola en el mismo Storage Account usado por `DianStorage`. Cada cinco
+minutos `ProgramarExtraccionXmlDian` consulta hasta 100 XML vigentes no
+extraídos y los encola; `ExtraerXmlDian` procesa el mensaje con
+`documentoXmlId`. Esto también recupera los XML históricos, sin descargarlos
+otra vez de la DIAN. Los duplicados de cola no duplican registros.
+
+Un XML que falla validaciones permanentes queda en `XmlExtraccionError` y no
+se publica en `vw_FacturaXmlMlV1` ni cambia a `PROCESADO`. Una falla transitoria
+de Blob o SQL deja fallar la Function para que Azure Queue aplique sus
+reintentos. Para reprocesar tras corregir la causa, un administrador debe
+retirar la fila concreta de `XmlExtraccionError`; no borrar el Blob ni la carga.
+
+Consulta de control (solo lectura):
+
+```sql
+SELECT x.DocumentoXmlID, d.DocumentoID, d.ClaveDocumento, d.EstadoProceso,
+       e.VersionExtractor, e.CantidadLineas, err.Codigo, err.Detalle
+FROM dian.DocumentoXml AS x
+JOIN dian.Documento AS d ON d.DocumentoID = x.DocumentoID
+LEFT JOIN dian.XmlExtraccion AS e ON e.DocumentoXmlID = x.DocumentoXmlID
+LEFT JOIN dian.XmlExtraccionError AS err ON err.DocumentoXmlID = x.DocumentoXmlID
+WHERE x.EsVigente = 1
+ORDER BY x.DocumentoXmlID;
+```
+
 `migrations/002_carga_archivo_idempotency.sql` es una migración de
 actualización para instalaciones anteriores. No hace falta ejecutarla en una
 base nueva porque `tables/CargaArchivo.sql` ya contiene el índice de

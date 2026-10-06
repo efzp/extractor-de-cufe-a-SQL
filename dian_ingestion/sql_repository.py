@@ -229,6 +229,51 @@ EXEC [dian].[sp_FinalizarConsultaDocumento]
             ),
         )
 
+    def get_xml_for_extraction(self, xml_id: int) -> dict[str, Any]:
+        return self._execute_one(
+            "EXEC [dian].[sp_ObtenerXmlParaExtraccion] @DocumentoXmlID = ?, @VersionExtractor = ?;",
+            (xml_id, 1),
+        )
+
+    def list_pending_xml_extractions(self, limit: int, version: int) -> list[dict[str, Any]]:
+        return self._execute_rows(
+            "EXEC [dian].[sp_ListarXmlPendientesExtraccion] @Limite = ?, @VersionExtractor = ?;",
+            (limit, version),
+        )
+
+    def save_xml_extraction(self, xml_id: int, header_json: str,
+                            lines_json: str) -> dict[str, Any]:
+        return self._execute_one(
+            "EXEC [dian].[sp_RegistrarExtraccionXml] @DocumentoXmlID = ?, "
+            "@CabeceraJson = ?, @LineasJson = ?;",
+            (xml_id, header_json, lines_json),
+        )
+
+    def record_xml_extraction_error(self, xml_id: int, version: int,
+                                    code: str, detail: str) -> dict[str, Any]:
+        return self._execute_one(
+            "EXEC [dian].[sp_RegistrarErrorExtraccionXml] @DocumentoXmlID = ?, "
+            "@VersionExtractor = ?, @Codigo = ?, @Detalle = ?;",
+            (xml_id, version, code, detail),
+        )
+
+    def _execute_rows(self, sql: str, parameters: tuple[Any, ...]) -> list[dict[str, Any]]:
+        if self._connection is None:
+            raise IngestionPersistenceError("La conexión SQL no está abierta.")
+        cursor = self._connection.cursor()
+        try:
+            cursor.execute(sql, parameters)
+            if cursor.description is None:
+                raise IngestionPersistenceError("El procedimiento no devolvió columnas.")
+            columns = [column[0] for column in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        except IngestionPersistenceError:
+            raise
+        except Exception as error:
+            raise IngestionPersistenceError("Falló una consulta del repositorio DIAN.") from error
+        finally:
+            cursor.close()
+
     def _execute_one(self, sql: str, parameters: tuple[Any, ...]) -> dict[str, Any]:
         if self._connection is None:
             raise IngestionPersistenceError("La conexión SQL no está abierta.")

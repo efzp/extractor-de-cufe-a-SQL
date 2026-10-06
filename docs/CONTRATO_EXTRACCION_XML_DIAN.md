@@ -1,6 +1,6 @@
 # Contrato de extracción XML DIAN v1
 
-Estado: propuesta verificable; no implementa tablas, funciones ni cambios de estado.
+Estado: extractor v1 implementado en código y scripts SQL; pendiente de despliegue y prueba integrada en Azure.
 
 ## Objetivo y alcance
 
@@ -40,7 +40,7 @@ Se usan los espacios de nombres UBL, no coincidencias globales por nombre local:
 | `nombre_proveedor` | `P/cac:PartyTaxScheme/cbc:RegistrationName`; si falta, `P/cac:PartyName/cbc:Name`. |
 | `ciudad_proveedor` | `P/cac:PhysicalLocation/cac:Address/cbc:CityName`; si falta, `P/cac:PartyTaxScheme/cac:RegistrationAddress/cbc:CityName`. |
 | `tax_level_proveedor` | `P/cac:PartyTaxScheme/cbc:TaxLevelCode`. Se elimina el espacio inicial accidental que añadía el conector Excel; la normalización del modelo ya limpia este campo. |
-| `tax_scheme_id` | `P/cac:PartyTaxScheme/cac:TaxScheme/cbc:ID`, texto. |
+| `tax_scheme_id` | `P/cac:PartyTaxScheme/cac:TaxScheme/cbc:ID`, texto canónico. El Excel antiguo convirtió `01` en `1` en numerosos casos; antes de usarlo como categoría ML se debe aplicar la misma normalización a entrenamiento e inferencia. |
 | `tax_scheme_nombre` | `P/cac:PartyTaxScheme/cac:TaxScheme/cbc:Name`. |
 | `codigo_industria_proveedor` | `P/cbc:IndustryClassificationCode`; nulo si no existe, nunca cero inventado. |
 | `cantidad_lineas_xml` | `R/cbc:LineCountNumeric` como entero; validar contra `count(L)`. |
@@ -84,7 +84,7 @@ Ejemplo comprobado: el XML `0ffbe66f...` y la fila 133 de `base datos factura.xl
 
 ## Criterios de aceptación antes de implementar
 
-1. Reproducir exactamente las diez comparaciones ya verificadas para las 270 filas históricas; extender el cotejo campo a campo a las 34 columnas, documentando diferencias legítimas como `id_carga` y el espacio de `tax_level_proveedor`.
+1. Reproducir las diez comparaciones ya verificadas para las 270 filas históricas; extender el cotejo campo a campo a las 34 columnas, documentando diferencias legítimas como `id_carga`, el espacio de `tax_level_proveedor`, los ceros iniciales perdidos por Excel y sus residuos de coma flotante. La prueba local de los 34 XML adicionales está en `docs/RESULTADO_PRUEBA_EXTRACCION_XML.md`.
 2. Probar los 34 XML adicionales: 34 lecturas correctas, 34 conteos de líneas correctos, 32 CUFE enlazados al libro y dos sin fila histórica, sin tomarlos por error de extracción.
 3. Probar las cinco `CreditNote` como registros canónicos sin emitir filas `Invoice` de compatibilidad.
 4. Probar explícitamente los casos de cargos/descuentos UBL no nulos: la proyección histórica mantiene la semántica vieja, mientras los valores canónicos conservan el valor real del UBL y una marca de discrepancia semántica.
