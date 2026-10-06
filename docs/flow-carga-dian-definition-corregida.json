@@ -1,0 +1,140 @@
+{
+  "name": "3cb8c84c-46ef-4082-93de-42227a353be0",
+  "id": "/providers/Microsoft.Flow/flows/3cb8c84c-46ef-4082-93de-42227a353be0",
+  "type": "Microsoft.Flow/flows",
+  "properties": {
+    "apiId": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+    "displayName": "Carga listados DIAN",
+    "definition": {
+      "metadata": {
+        "workflowEntityId": null,
+        "processAdvisorMetadata": null,
+        "flowChargedByPaygo": null,
+        "flowclientsuspensionreason": "None",
+        "flowclientsuspensiontime": null,
+        "flowclientsuspensionreasondetails": null,
+        "creator": {
+          "id": "f9f05dfe-c118-4b9b-baeb-792b3586f7f6",
+          "type": "User",
+          "tenantId": "adcdcb5c-59e9-405d-bea2-12f9266646a1"
+        },
+        "provisioningMethod": "FromDefinition",
+        "failureAlertSubscription": true,
+        "clientLastModifiedTime": "2026-10-06T00:12:15.8617845Z",
+        "lastModifiedBy": "f9f05dfe-c118-4b9b-baeb-792b3586f7f6",
+        "connectionKeySavedTimeKey": "2026-10-06T00:12:15.8617845Z",
+        "creationSource": "Portal",
+        "modifiedSources": "Portal"
+      },
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": { "defaultValue": {}, "type": "SecureObject" },
+        "$connections": { "defaultValue": {}, "type": "Object" }
+      },
+      "triggers": {
+        "When_a_file_is_created_(properties_only)": {
+          "recurrence": { "frequency": "Minute", "interval": 1 },
+          "evaluatedRecurrence": { "frequency": "Minute", "interval": 1 },
+          "splitOn": "@triggerOutputs()?['body/value']",
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "dataset": "https://cpabaas.sharepoint.com/sites/AutomatizacinXMLDIAN",
+              "table": "349cb602-62b8-4c5f-9929-400912c0c583"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+              "connectionName": "shared_sharepointonline",
+              "operationId": "GetOnNewFileItems"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      },
+      "actions": {
+        "Condition": {
+          "actions": {
+            "Get_file_content": {
+              "type": "OpenApiConnection",
+              "inputs": {
+                "parameters": {
+                  "dataset": "https://cpabaas.sharepoint.com/sites/AutomatizacinXMLDIAN",
+                  "id": "@triggerBody()?['{Identifier}']",
+                  "inferContentType": true
+                },
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                  "connectionName": "shared_sharepointonline",
+                  "operationId": "GetFileContent"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Get_file_metadata": {
+              "runAfter": { "Get_file_content": ["Succeeded"] },
+              "type": "OpenApiConnection",
+              "inputs": {
+                "parameters": {
+                  "dataset": "https://cpabaas.sharepoint.com/sites/AutomatizacinXMLDIAN",
+                  "id": "@triggerBody()?['{Identifier}']"
+                },
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                  "connectionName": "shared_sharepointonline",
+                  "operationId": "GetFileMetadata"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "HTTP": {
+              "runAfter": { "Get_file_metadata": ["Succeeded"] },
+              "type": "Http",
+              "inputs": {
+                "uri": "https://func-dian-xml-cpabaas-dev.azurewebsites.net/api/dian/cargas/1",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                  "x-functions-key": "REEMPLAZAR_POR_CLAVE_NUEVA_DE_RECIBIRCARGADIAN",
+                  "x-file-name": "@{concat('listado-dian-', string(triggerBody()?['ID']), '.xlsx')}",
+                  "x-sharepoint-item-id": "@{triggerBody()?['ID']}",
+                  "x-sharepoint-etag": "@{outputs('Get_file_metadata')?['body/ETag']}"
+                },
+                "body": "@body('Get_file_content')"
+              },
+              "runtimeConfiguration": {
+                "secureData": { "properties": ["inputs", "outputs"] }
+              }
+            }
+          },
+          "runAfter": {},
+          "else": { "actions": {} },
+          "expression": {
+            "and": [
+              {
+                "endsWith": [
+                  "@toLower(coalesce(triggerBody()?['{FilenameWithExtension}'], ''))",
+                  ".xlsx"
+                ]
+              }
+            ]
+          },
+          "type": "If"
+        }
+      },
+      "outputs": {}
+    },
+    "connectionReferences": {
+      "shared_sharepointonline": {
+        "connectionName": "shared-sharepointonl-05f4be82-4c46-4dd8-b4e8-3c23104c14f3",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+        "tier": "NotSpecified",
+        "apiName": "sharepointonline",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      }
+    },
+    "flowFailureAlertSubscribed": false,
+    "isManaged": false
+  }
+}
