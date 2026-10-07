@@ -4,6 +4,13 @@ El workflow `.github/workflows/tests.yml` ejecuta las pruebas locales en cada
 PR. Un push a `main` ejecuta las pruebas, prepara `xml-dian` y luego despliega
 `func-dian-xml-cpabaas-dev`. No instala ni modifica procedimientos Azure SQL.
 
+La ingesta contable requiere preparación adicional antes de publicar el código:
+crear el contenedor privado `cargas-contabilidad`, la cola
+`contabilidad-cargas-pendientes`, sus permisos de identidad administrada y el
+App Setting `CONTABILIDAD_LOAD_QUEUE_NAME`. El workflow actual solo prepara
+`xml-dian`; no crea los recursos contables. Consulte
+`docs/CONTABILIDAD_INGESTION.md` para el contrato completo.
+
 ## Configuración previa en GitHub
 
 En **Settings → Secrets and variables → Actions → Variables** configure:

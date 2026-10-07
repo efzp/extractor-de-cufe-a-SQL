@@ -4,6 +4,46 @@ Azure SQL es la fuente de verdad de las cargas y documentos DIAN. La Function
 usa identidad administrada y solo recibe `EXECUTE` sobre procedimientos
 autorizados; no se conceden permisos generales sobre las tablas.
 
+## Contabilidad historica (ampliacion 004)
+
+Ejecutar primero `migrations/004_contabilidad_historica.sql` una sola vez en
+`sqldb-dian-xml-cpabaas-dev`. Crea el esquema `contabilidad` y las tablas
+`CargaArchivo`, `MovimientoHistorico` y `CargaMovimiento` sin tocar los datos
+DIAN. Despues, en el editor web de Azure SQL, pegar y ejecutar una sola vez
+`../scripts/Instalar-ProcedimientosContables.sql` (sin `GO`). El archivo se
+regenera desde los tres procedimientos fuente y los permisos con
+`../scripts/Generar-InstalacionProcedimientosContables.py`.
+
+Como alternativa, ejecutar **por separado** cada archivo `CREATE OR ALTER
+PROCEDURE`, en este orden:
+
+1. `procedures/sp_IniciarCargaContable.sql`
+2. `procedures/sp_RegistrarMovimientoContable.sql`
+3. `procedures/sp_FinalizarCargaContable.sql`
+4. `security/contabilidad_runtime_grants.sql`
+
+No combinar la alternativa con el instalador unico. `CREATE OR ALTER PROCEDURE` debe comenzar su propio lote. El script de
+permisos concede solo `EXECUTE` al rol existente `dian_runtime`. La prueba
+`tests/test_ContabilidadHistorica.sql` crea datos dentro de una transaccion
+que siempre revierte; ejecutarla despues de instalar los procedimientos.
+
+El registro recibe `FilaJson` con las claves PascalCase de
+`MovimientoHistorico` (por ejemplo, `Fecha`, `TipoDoc`, `IndContabilidad`,
+`Debito`, `Credito`). La Function debe convertir `FECHA` a `aaaa-mm-dd`,
+`FECHA_SISTEMA` a ISO 8601 sin zona, los importes a decimal con punto y los
+identificadores a texto. `NumeroMovil` es opcional en el formato antiguo.
+SQL calcula `HashContenidoSha256` version 1 sobre un JSON de valores
+normalizados de `Fecha`, `Documento`, `TipoDoc`, `NumDoc`, `Cuenta`, `Concepto`,
+`Naturaleza`, `Centro`, `CC`, `Debito`, `Credito`, `IdentidadTercero` y
+`DocFuente`, en ese orden, codificado como UTF-16LE. El hash no es unico.
+
+La primera fila de cada `(ClienteID, FuenteContable, IndContabilidad)` se
+conserva. Si vuelve con el mismo hash, la fila de carga queda `DUPLICADO`;
+si cambia el hash, queda `ID_CON_CONTENIDO_DISTINTO` sin actualizar la
+contabilidad historica. Un ID nuevo se inserta aun si el rango de fechas ya
+se habia cargado. El SHA-256 del XLSX, dentro del mismo cliente y fuente,
+impide procesar dos veces los mismos bytes.
+
 ## Orden de despliegue
 
 Para una base de datos nueva, ejecutar en este orden:

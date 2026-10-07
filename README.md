@@ -15,6 +15,10 @@ La ingestión masiva está implementada en tres etapas:
 `DianGetXmlPoc` continúa disponible como prueba de consulta individual sin
 persistencia.
 
+La contabilidad historica usa dos Functions adicionales: `RecibirCargaContable`
+recibe el XLSX desde Power Automate y `ProcesarCargaContable` lo registra desde
+una cola mediante los procedimientos del esquema `contabilidad`.
+
 ## Preparación local
 
 Requisitos:
@@ -60,6 +64,9 @@ contrato completo y las consideraciones de seguridad.
 Consulte [docs/DIAN_XLSX_INGESTION.md](docs/DIAN_XLSX_INGESTION.md) para el
 contrato del endpoint de cargas, colas, variables y permisos.
 
+Consulte [docs/CONTABILIDAD_INGESTION.md](docs/CONTABILIDAD_INGESTION.md) para
+el endpoint contable, la configuracion de Storage y el envio desde SharePoint.
+
 Consulte [docs/DEPLOY.md](docs/DEPLOY.md) antes de desplegar: GitHub Actions
 prepara el contenedor privado `xml-dian` y su permiso de identidad administrada
 antes de publicar la Function.
@@ -67,6 +74,6 @@ antes de publicar la Function.
 ## Pruebas
 
 ```powershell
-.\.venv\Scripts\python.exe -m compileall -q function_app.py dian dian_ingestion tests
+.\.venv\Scripts\python.exe -m compileall -q function_app.py dian dian_ingestion contabilidad_ingestion tests
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```

@@ -20,9 +20,92 @@ from dian_ingestion.xml_extraction_service import (
     enqueue_pending_extractions,
     process_xml_extraction,
 )
+from contabilidad_ingestion.service import (
+    accept_accounting_upload,
+    process_accounting_load,
+)
 
 
 app = func.FunctionApp()
+
+
+@app.function_name(name="RecibirCargaContable")
+@app.route(
+    route="contabilidad/cargas/{cliente_id}",
+    methods=["POST"],
+    auth_level=func.AuthLevel.FUNCTION,
+)
+def receive_accounting_load(req: func.HttpRequest) -> func.HttpResponse:
+    """Recibe un XLSX contable binario y agenda su procesamiento."""
+    try:
+        client_id = int(req.route_params.get("cliente_id", ""))
+    except (TypeError, ValueError):
+        return _json_response(
+            {"status": "REJECTED", "message": "ClienteID debe ser positivo."}, 400
+        )
+
+    try:
+        queued = accept_accounting_upload(
+            client_id=client_id,
+            source=req.params.get("fuenteContable", ""),
+            file_name=req.params.get("nombreArchivo", ""),
+            content=req.get_body(),
+            preferred_sheet=req.params.get("nombreHoja"),
+            sharepoint_item_id=req.params.get("sharePointItemId"),
+            sharepoint_url=req.params.get("sharePointUrl"),
+            etag=req.params.get("etag"),
+            uploaded_by=req.params.get("cargadoPor"),
+        )
+        return _json_response(
+            {
+                "status": "ACCEPTED",
+                "correlationId": queued.correlation_id,
+                "clienteId": queued.client_id,
+                "message": "Archivo almacenado y pendiente de procesamiento.",
+            },
+            202,
+        )
+    except SpreadsheetValidationError as error:
+        return _json_response({"status": "REJECTED", "message": str(error)}, 400)
+    except IngestionConfigurationError:
+        logging.exception("La ingesta contable no esta configurada.")
+        return _json_response(
+            {"status": "NOT_CONFIGURED", "message": "Falta configurar la ingesta contable."},
+            503,
+        )
+    except Exception:
+        logging.exception("No fue posible recibir el XLSX contable.")
+        return _json_response(
+            {"status": "ERROR", "message": "No fue posible almacenar y agendar el XLSX."},
+            500,
+        )
+
+
+@app.function_name(name="ProcesarCargaContable")
+@app.queue_trigger(
+    arg_name="message",
+    queue_name="%CONTABILIDAD_LOAD_QUEUE_NAME%",
+    connection="DianStorage",
+)
+def process_accounting_queue(message: func.QueueMessage) -> None:
+    """Registra cada fila del XLSX en los procedimientos contables."""
+    try:
+        summary = process_accounting_load(message.get_body().decode("utf-8"))
+        logging.info(
+            "Carga contable procesada. correlationId=%s cargaArchivoId=%s "
+            "estado=%s total=%s nuevas=%s duplicadas=%s conflictos=%s rechazadas=%s",
+            summary.correlation_id,
+            summary.load_id,
+            summary.status,
+            summary.total_rows,
+            summary.new_rows,
+            summary.duplicate_rows,
+            summary.conflict_rows,
+            summary.rejected_rows,
+        )
+    except Exception:
+        logging.exception("Fallo el procesamiento de una carga contable.")
+        raise
 
 
 @app.function_name(name="RecibirCargaDian")
