@@ -16,6 +16,7 @@ import sys
 import tempfile
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 
 
@@ -158,7 +159,6 @@ def conectar_sql(servidor: str, base: str, driver: str):
     cadena = (
         f"DRIVER={{{driver}}};SERVER=tcp:{servidor},1433;DATABASE={base};"
         "Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
-        "ApplicationIntent=ReadOnly;"
     )
     return pyodbc.connect(
         cadena, attrs_before={1256: token_odbc}, autocommit=True
@@ -205,6 +205,10 @@ def escribir_xlsx(df, ruta: Path) -> None:
         for valor in fila:
             if isinstance(valor, (tuple, list, dict)):
                 valor = str(valor)
+            elif isinstance(valor, Decimal):
+                # Evita que Excel redondee un decimal SQL antes de que el
+                # normalizador historico lo convierta a float.
+                valor = format(valor, "f")
             elif valor is pd.NA or valor is pd.NaT or valor is None:
                 valor = None
             elif not isinstance(valor, (str, bytes)) and pd.isna(valor):
@@ -331,6 +335,8 @@ def crear_resumen(resultados: dict, args: argparse.Namespace, motor: Path, limpi
     matches = resultados["matches"]
     estados = {str(k): int(v) for k, v in matches["estado_match"].value_counts().items()}
     aceptados = sum(estados.get(estado, 0) for estado in ESTADOS_OK)
+    rango_facturas = _fecha_rango(facturas["fecha_emision"])
+    rango_movimientos = _fecha_rango(movimientos["fecha_mov"])
     return {
         "fecha_utc": datetime.now(timezone.utc).isoformat(),
         "alcance": {
@@ -345,9 +351,9 @@ def crear_resumen(resultados: dict, args: argparse.Namespace, motor: Path, limpi
             limpieza.name: hashlib.sha256(limpieza.read_bytes()).hexdigest(),
         },
         "facturas_invoice_procesadas": len(facturas),
-        "rango_facturas": _fecha_rango(facturas["fecha_emision"]),
+        "rango_facturas": rango_facturas,
         "movimientos_historicos": len(movimientos),
-        "rango_movimientos": _fecha_rango(movimientos["fecha_mov"]),
+        "rango_movimientos": rango_movimientos,
         "movimientos_fc": len(resultados["movimientos_fc"]),
         "asientos_fc": len(resultados["asientos"]),
         "candidatos": len(resultados["candidatos"]),

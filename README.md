@@ -67,6 +67,10 @@ contrato del endpoint de cargas, colas, variables y permisos.
 Consulte [docs/CONTABILIDAD_INGESTION.md](docs/CONTABILIDAD_INGESTION.md) para
 el endpoint contable, la configuracion de Storage y el envio desde SharePoint.
 
+Consulte [docs/MATCHING_AZURE_VALIDACION.md](docs/MATCHING_AZURE_VALIDACION.md)
+para ejecutar el matching historico sobre Azure SQL en modo de validacion y
+comparar su cobertura sin entrenar el modelo.
+
 Consulte [docs/DEPLOY.md](docs/DEPLOY.md) antes de desplegar: GitHub Actions
 prepara el contenedor privado `xml-dian` y su permiso de identidad administrada
 antes de publicar la Function.

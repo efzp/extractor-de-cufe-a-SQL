@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 import azure.functions as func
 
@@ -24,9 +25,92 @@ from contabilidad_ingestion.service import (
     accept_accounting_upload,
     process_accounting_load,
 )
+from ml_dataset.config import DatasetConfigurationError
+from ml_dataset.message import DatasetMessage
+from ml_dataset.service import enqueue as enqueue_ml_dataset, generate_dataset
 
 
 app = func.FunctionApp()
+
+
+@app.function_name(name="SolicitarDatasetEntrenamiento")
+@app.route(
+    route="ml/datasets/{cliente_id}",
+    methods=["POST"],
+    auth_level=func.AuthLevel.FUNCTION,
+)
+def request_training_dataset(req: func.HttpRequest) -> func.HttpResponse:
+    """Agenda un snapshot del dataset; no ejecuta el matching en HTTP."""
+    try:
+        payload = req.get_json()
+        if not isinstance(payload, dict):
+            raise ValueError("Se requiere un objeto JSON.")
+        message = DatasetMessage.create(
+            int(req.route_params.get("cliente_id", "")),
+            payload.get("fuenteContable"),
+        )
+    except (TypeError, ValueError) as error:
+        return _json_response({"status": "REJECTED", "message": str(error)}, 400)
+    try:
+        enqueue_ml_dataset(message)
+        return _json_response(
+            {
+                "status": "ACCEPTED",
+                "correlationId": message.correlation_id,
+                "clienteId": message.client_id,
+                "fuenteContable": message.accounting_source,
+            },
+            202,
+        )
+    except DatasetConfigurationError:
+        logging.exception("La generacion del dataset ML no esta configurada.")
+        return _json_response(
+            {"status": "NOT_CONFIGURED", "message": "Falta configurar el dataset ML."},
+            503,
+        )
+    except Exception:
+        logging.exception("No fue posible encolar el dataset ML.")
+        return _json_response(
+            {"status": "ERROR", "message": "No fue posible agendar el dataset."},
+            500,
+        )
+
+
+@app.function_name(name="ProgramarDatasetEntrenamiento")
+@app.timer_trigger(schedule="0 0 3 * * *", arg_name="timer", run_on_startup=False)
+def schedule_training_dataset(timer: func.TimerRequest) -> None:
+    """Programa un snapshot diario cuando ML_DATASET_ENABLED=true."""
+    if os.environ.get("ML_DATASET_ENABLED", "false").strip().lower() != "true":
+        return
+    message = DatasetMessage.create(
+        int(os.environ["ML_DATASET_CLIENTE_ID"]),
+        os.environ["ML_DATASET_FUENTE_CONTABLE"],
+    )
+    enqueue_ml_dataset(message)
+    logging.info("Dataset ML encolado. correlationId=%s", message.correlation_id)
+
+
+@app.function_name(name="GenerarDatasetEntrenamiento")
+@app.queue_trigger(
+    arg_name="message",
+    queue_name="%ML_DATASET_QUEUE_NAME%",
+    connection="DianStorage",
+)
+def process_training_dataset(message: func.QueueMessage) -> None:
+    """Ejecuta el matching historico y publica una version en Azure SQL."""
+    try:
+        result = generate_dataset(message.get_body().decode("utf-8"))
+        logging.info(
+            "Dataset ML. correlationId=%s datasetVersionId=%s resultado=%s "
+            "facturas=%s movimientos=%s aceptadas=%s codigoSha256=%s "
+            "facturasSha256=%s movimientosSha256=%s",
+            result.correlation_id, result.dataset_version_id, result.result,
+            result.invoices, result.movements, result.accepted,
+            result.code_hash, result.invoices_hash, result.movements_hash,
+        )
+    except Exception:
+        logging.exception("Fallo la generacion del dataset ML.")
+        raise
 
 
 @app.function_name(name="RecibirCargaContable")

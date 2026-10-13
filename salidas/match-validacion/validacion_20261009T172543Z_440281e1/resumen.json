@@ -1,0 +1,44 @@
+{
+  "fecha_utc": "2026-10-09T17:25:43.717152+00:00",
+  "alcance": {
+    "servidor": "sql-dian-xml-cpabaas-dev.database.windows.net",
+    "base": "sqldb-dian-xml-cpabaas-dev",
+    "cliente_id": 1,
+    "fuente_contable": "ERP_CPA_BAAS",
+    "carga_dian_id": null
+  },
+  "version_scripts_sha256": {
+    "procesamiento_facturas_contabilidad_match.py": "816791e95fdf4ce4736d3b5bda6dafad615eac3aea8a4ccf3040442295834ba7",
+    "funciones_de_limpieza_base_datos_factura.py": "a94b2fc49f0b0c218711804e0c1212b6a74c52cb573856f461383e6b1543c128"
+  },
+  "facturas_invoice_procesadas": 3030,
+  "rango_facturas": {
+    "desde": "2024-01-01",
+    "hasta": "2026-10-05"
+  },
+  "movimientos_historicos": 32103,
+  "rango_movimientos": {
+    "desde": "2024-01-01",
+    "hasta": "2026-08-31"
+  },
+  "movimientos_fc": 6132,
+  "asientos_fc": 1755,
+  "candidatos": 71611,
+  "estados_match": {
+    "OK_TEXTO": 1380,
+    "REVISION_MANUAL": 1263,
+    "SIN_MATCH": 221,
+    "OK_UNICO": 160,
+    "REVISION_MULTIASIENTO": 6
+  },
+  "matches_aceptados": 1540,
+  "cobertura_match_pct": 50.83,
+  "observacion": "La cobertura no es precision. Compare solo periodos y fuentes equivalentes; este proceso no modifica reglas ni entrena el modelo.",
+  "comparacion_referencia": {
+    "llaves_comunes": 885,
+    "solo_azure": 2145,
+    "solo_referencia": 0,
+    "mismo_estado": 885,
+    "mismo_asiento": 885
+  }
+}
