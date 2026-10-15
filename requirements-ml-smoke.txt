@@ -1,0 +1,7 @@
+# Versiones del manifiesto del artefacto 20261014T161302Z_e0d0db9a.
+# Imagen de prueba Linux: no modifica requirements.txt de la Function DIAN.
+autogluon.tabular[all]==1.6.1
+pandas==2.3.3
+numpy==2.4.6
+scikit-learn==1.9.1
+openpyxl==3.1.5

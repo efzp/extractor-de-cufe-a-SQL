@@ -4,6 +4,26 @@ Azure SQL es la fuente de verdad de las cargas y documentos DIAN. La Function
 usa identidad administrada y solo recibe `EXECUTE` sobre procedimientos
 autorizados; no se conceden permisos generales sobre las tablas.
 
+## Predicciones de plantillas contables (ampliacion 006)
+
+Ejecutar `migrations/006_ml_prediccion_plantilla.sql` una sola vez, despues
+de instalar el dataset ML. Luego ejecutar en lotes **separados**
+`procedures/sp_RegistrarPrediccionPlantilla.sql` y
+`security/ml_prediccion_runtime_grants.sql`. El procedimiento debe comenzar
+su propio lote en el editor web de Azure SQL; no agregar `GO`.
+
+La clave idempotente es `(DocumentoXmlID, ModeloArtefactoSha256)`. Un reintento
+equivalente devuelve `YA_EXISTE` sin cambiar la prediccion ni la revision.
+Se exigen igualdad exacta de version, nombre, manifiesto, hash de variables y
+las tres plantillas. Cada probabilidad puede diferir como maximo `0.000001`
+respecto al valor almacenado; diferencias mayores se rechazan con `50917`.
+La tolerancia cubre pequenas variaciones numericas entre ejecuciones del
+mismo modelo, no cambios de etiquetas o variables. Solo se aceptan facturas
+`Invoice` vigentes y procesadas que no
+pertenezcan al dataset de entrenamiento indicado. SQL registra los hash de
+procedencia recibidos, pero la verificacion del contenido real del artefacto
+y el calculo canonico de `HashVariablesSha256` corresponden al productor.
+
 ## Contabilidad historica (ampliacion 004)
 
 Ejecutar primero `migrations/004_contabilidad_historica.sql` una sola vez en

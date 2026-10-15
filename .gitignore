@@ -10,6 +10,7 @@ local.settings.json
 __pycache__/
 *.py[cod]
 .venv/
+.venv-ml/
 .uv-cache/
 .python_packages/
 .azurefunctions/

@@ -1,0 +1,5 @@
+# Motor y limpieza fijados al manifiesto del paquete publicado.
+-r requirements-ml-smoke.txt
+azure-identity==1.26.0
+azure-storage-blob==12.31.0
+pyodbc==5.2.0
